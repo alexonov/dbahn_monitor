@@ -105,3 +105,5 @@ $RECYCLE.BIN/
 *.html
 *.csv
 *.7z
+/secrets.py
+/venv/

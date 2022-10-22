@@ -1,47 +1,45 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Mar 17 21:34:30 2015
-
-@author: florian.mueller
-"""
-
 import json
-import urllib2
+from urllib.request import urlopen
+from urllib import parse
 import re
 
 
-def querySuggestionsByName(trainStationName):
-    url = "http://reiseauskunft.bahn.de/bin/ajax-getstop.exe/dn?REQ0JourneyStopsS0A=1&REQ0JourneyStopsS0G=" + urllib2.quote(trainStationName)
-    request = urllib2.urlopen(url)
+def query_suggestions_by_name(train_station_name):
+    url = "http://reiseauskunft.bahn.de/bin/ajax-getstop.exe/dn?REQ0JourneyStopsS0A=1&REQ0JourneyStopsS0G=" + parse.quote(train_station_name)
+    request = urlopen(url)
     content = request.read()
     request.close()
     return content
 
-def cleanSuggestions(rawSuggestions):
-    match = re.search('SLs\\.sls=(\\{.*\\});SLs\\.showSuggestion\\(\\);', rawSuggestions)
+
+def clean_suggestions(raw_suggestions):
+    match = re.search('SLs\\.sls=(\\{.*\\});SLs\\.showSuggestion\\(\\);', str(raw_suggestions, "ISO-8859-1"))
     return match.group(1)
-    
-def selectTrainStationId(cleanSuggestions):
-    decodedSuggestions = json.loads(unicode(cleanSuggestions, "ISO-8859-1"))['suggestions']
-    if len(decodedSuggestions) < 1:
+
+
+def select_train_station_id(cleaned_suggestions):
+    decoded_suggestions = json.loads(cleaned_suggestions)['suggestions']
+    if len(decoded_suggestions) < 1:
         return -1
     else:
-        return json.loads(unicode(cleanSuggestions, "ISO-8859-1"))['suggestions'][0]['extId']
-    
-def getTrainStationId(trainStationName):
-    rawSuggestions = querySuggestionsByName(trainStationName)
-    cleanedSuggestions = cleanSuggestions(rawSuggestions)
-    return selectTrainStationId(cleanedSuggestions)
-    
-    
-trainStationNames = ['Berlin Gesundbrunnen', 'Berlin Hbf', 'Berlin Ostbahnhof', 'Berlin Südkreuz', 'Dortmund Hbf', 'Dresden Hbf', 'Düsseldorf Hbf', 'Duisburg Hbf', 'Essen Hbf', 'Frankfurt Hbf', 'Hamburg-Altona', 'Hamburg Hbf', 'Hannover Hbf', 'Karlsruhe Hbf', 'Köln Hbf', 'Köln Messe/Deutz', 'Leipzig Hbf', 'München Hbf', 'München Ost', 'Nürnberg Hbf', 'Stuttgart Hbf','Aachen Hbf', 'Aalen', 'Altenbeken', 'Aschaffenburg Hbf', 'Augsburg Hbf', 'Bad Oldesloe', 'Bamberg', 'Berlin Friedrichstraße', 'Berlin-Lichtenberg', 'Berlin Potsdamer Platz', 'Berlin-Spandau', 'Berlin-Wannsee', 'Berlin Zoologischer Garten', 'Bielefeld Hbf', 'Bietigheim-Bissingen', 'Bochum Hbf', 'Bonn Hbf', 'Braunschweig Hbf', 'Bremen Hbf', 'Bruchsal', 'Chemnitz Hbf', 'Cottbus', 'Darmstadt Hbf', 'Dresden-Neustadt', 'Düsseldorf Flughafen', 'Erfurt Hbf', 'Frankfurt Süd', 'Freiburg Hbf', 'Fulda', 'Fürth Hbf', 'Gelsenkirchen Hbf', 'Gießen', 'Göttingen', 'Hagen Hbf', 'Halle Hbf', 'Hamburg Dammtor', 'Hamburg-Harburg', 'Hamm ', 'Hanau Hbf', 'Heidelberg Hbf', 'Heilbronn Hbf', 'Herford', 'Hildesheim Hbf', 'Kaiserslautern Hbf', 'Kassel Hbf', 'Kassel-Wilhelmshöhe', 'Kiel Hbf', 'Koblenz Hbf', 'Lübeck Hbf', 'Ludwigshafen Hbf', 'Lüneburg', 'Magdeburg Hbf', 'Mainz Hbf', 'Mannheim Hbf', 'Mönchengladbach Hbf', 'München-Pasing', 'Münster Hbf', 'Neumünster', 'Neuss Hbf', 'Neustadt Hbf', 'Oberhausen Hbf', 'Offenburg', 'Oldenburg Hbf', 'Osnabrück Hbf', 'Pforzheim Hbf', 'Plochingen', 'Potsdam Hbf', 'Regensburg Hbf', 'Rosenheim', 'Rostock Hbf', 'Saarbrücken Hbf', 'Singen ', 'Solingen Hbf', 'Trier Hbf', 'Tübingen Hbf', 'Uelzen', 'Ulm Hbf', 'Weimar', 'Wiesbaden Hbf', 'Wolfsburg Hbf', 'Worms Hbf', 'Wuppertal Hbf', 'Würzburg Hbf']
+        return decoded_suggestions[0]['extId']
 
-trainStationIds = []
-tsidsString = "["
 
-for trainStationName in trainStationNames:
-    id = getTrainStationId(trainStationName)
-    trainStationIds.append(id)
-    tsidsString = tsidsString + "'" + id + "', "  
-    
-print tsidsString
+def select_station_name(cleaned_suggestions):
+    decoded_suggestions = json.loads(cleaned_suggestions)['suggestions']
+    if len(decoded_suggestions) < 1:
+        return None
+    else:
+        return decoded_suggestions[0]['value']
+
+
+def get_train_station_id(train_station_name):
+    raw_suggestions = query_suggestions_by_name(train_station_name)
+    cleaned_suggestions = clean_suggestions(raw_suggestions)
+    return select_train_station_id(cleaned_suggestions)
+
+
+if __name__ == '__main__':
+    train_station = 'H'
+    station_id = get_train_station_id(train_station)
+    print(station_id)
