@@ -25,14 +25,7 @@ from url_constructor import create_request_string, BoardType
 from settings import CENTRAL_STATION, STATIONS_TO_MONITOR
 from get_trainstation_ids import get_train_station_id
 from alert import Alert
-import logging
 import sys
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
-)
-logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
 
 def _remove_leading_zeros(s):
@@ -68,7 +61,7 @@ def fetch_data_arrivals(station_ids):
     red_alerts = []
     train_ids = []
     for request in arrival_requests:
-        logging.debug(f'Extracting arrival info for url {request}')
+        print(f'Extracting arrival info for url {request}')
 
         for row in _find_journey_rows(request):
             alert = Alert.generate_from_row(row)
@@ -80,9 +73,9 @@ def fetch_data_arrivals(station_ids):
             else:
                 red_alerts.append(alert)
 
-    logging.info(f'Found {len(red_alerts)} red alerts from {CENTRAL_STATION}')
+    print(f'Found {len(red_alerts)} red alerts from {CENTRAL_STATION}')
 
-    logging.info(f'Found {len(train_ids)} trains from {CENTRAL_STATION}: {train_ids}')
+    print(f'Found {len(train_ids)} trains from {CENTRAL_STATION}: {train_ids}')
 
     central_station_id = _remove_leading_zeros(get_train_station_id(CENTRAL_STATION))
     departure_from_central_requests = [
@@ -94,7 +87,7 @@ def fetch_data_arrivals(station_ids):
 
 
 def parse_departure(request):
-    logging.debug(f'Extracting departing info from url: {request}')
+    print(f'Extracting departing info from url: {request}')
     alerts = [Alert.generate_from_row(row) for row in _find_journey_rows(request)]
     alerts = [
         a for a in alerts
