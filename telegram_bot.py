@@ -1,6 +1,7 @@
 import requests
 
 from secrets import BOT_TOKEN, CHANNEL_ID
+from alert import Alert
 
 
 BASE_URL = 'https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&text={MESSAGE}&parse_mode=Markdown'
@@ -15,20 +16,13 @@ def compile_url(message):
     )
 
 
-def notify(alerts):
+def send_alerts(alerts: list[Alert]):
     for alert in alerts:
-        formatted_alert = format_alert(alert)
-        requests.post(compile_url(formatted_alert))
+        notify(alert.formatted_alert)
 
 
-def format_alert(alert):
-    return f"""Внимание!
-    поезд: *{alert["train_name"]}*
-    направление: *{alert["direction"]}*
-    время: *{alert["planned_time"]}*
-    платформа: *{alert["platform"]}*
-    статус: *{alert["message"]}*
-    """
+def notify(message):
+    requests.post(compile_url(message))
 
 
 def get_updates():
@@ -36,5 +30,5 @@ def get_updates():
 
 
 if __name__ == '__main__':
-    notify(['test'])
+    notify('test')
     # print(get_updates())

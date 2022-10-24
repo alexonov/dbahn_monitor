@@ -1,83 +1,122 @@
+"""
+The goal is to find out if there are delays or cancellations
+We only care about certain stations, i.e.
+Hamburg -> station and station -> Hamburg
+
+For that we query departures from the station and arrivals to the station
+
+1. Departures to the station - we only need trains going TO Hamburg
+    This is an easy case, we just parse the message as it is,
+    the delay time is the time we care about
+
+2. Arrivals - we only need trains coming FROM Hamburg
+    This case in not that simple. We need to know the time of
+    departure from Hamburg.
+    So first we save make a list of all the train from Hamburg,
+    then go look at the Hamburg departure board and check the status there
+
+"""
 import requests
 from bs4 import BeautifulSoup
 
 import re
-import pprint
 
-from url_constructor import create_request_string
-from settings import STATIONS_AND_TRAINS
+from url_constructor import create_request_string, BoardType
+from settings import CENTRAL_STATION, STATIONS_TO_MONITOR
 from get_trainstation_ids import get_train_station_id
+from alert import Alert
+import logging
+import sys
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
+)
+logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
 
 def _remove_leading_zeros(s):
     return re.search("0*(\\d*)", s).group(1)
 
 
-def create_requests(use_train_id=True):
-
-    train_stations = list(STATIONS_AND_TRAINS.keys())
-
-    station_name_to_id = {
-        station: _remove_leading_zeros(get_train_station_id(station))
-        for station in train_stations
-    }
-
-    train_station_requests = []
-
-    for station_name in train_stations:
-        station_id = station_name_to_id[station_name]
-
-        train_codes = STATIONS_AND_TRAINS[station_name] if use_train_id else [None]
-
-        for train_code in train_codes:
-            train_station_requests.append(create_request_string(station_id, train_code=train_code))
-
-    return train_station_requests
+def create_request(station_name, board_type):
+    station_id = _remove_leading_zeros(get_train_station_id(station_name))
+    request = create_request_string(station_id, board_type=board_type)
+    return request
 
 
-def parse_row(row):
-    parsed_row = {
-        'planned_time': row.find_next('td', class_='time').text.strip(),
-        'train_name': row.find_next('span', class_='nowrap').text.strip(),
-        'platform': row.find_next('td', class_='platform').text.strip(),
-        'message': row.find_next('td', class_='ris').text.strip()
-    }
-    direction_cell = row.find_next('td', class_='route')
-    parsed_row['direction'] = direction_cell.find_next('span', class_='bold').text.strip()
-    return parsed_row
+def create_departure_request(station_name):
+    return create_request(station_name, BoardType.DEPARTURE)
 
 
-def parse_request(r):
-    print(r)
+def create_arrival_request(station_name):
+    return create_request(station_name, BoardType.ARRIVAL)
 
-    soup = BeautifulSoup(requests.get(r).text, 'html.parser')
 
-    rows = soup.findAll('tr', id=lambda x: x and x.startswith('journeyRow'))
+def fetch_data_departures(station_ids):
+    departure_to_central_requests = [
+        create_request_string(sid, board_type=BoardType.DEPARTURE) for sid in station_ids
+    ]
+    departure_alerts = [a for req in departure_to_central_requests for a in parse_departure(req)]
+    return departure_alerts
 
-    alerts = []
 
-    for row in rows:
-        info = row.find_next('td', class_='ris')
+def fetch_data_arrivals(station_ids):
+    arrival_requests = [create_request_string(sid, board_type=BoardType.ARRIVAL) for sid in station_ids]
 
-        # if not empty then something is wrong
-        if info.text.strip() != '':
-            # save info and platform just in case
-            # TODO: parse what exactly is the problem
-            potential_alert = parse_row(row)
+    # keep train id is missing - keep as is, otherwise go to hamburg board
+    red_alerts = []
+    train_ids = []
+    for request in arrival_requests:
+        logging.debug(f'Extracting arrival info for url {request}')
 
-            # if message is the same as planned time then it's not an actual delay
-            if potential_alert['planned_time'] != potential_alert['message']:
-                alerts.append(potential_alert)
+        for row in _find_journey_rows(request):
+            alert = Alert.generate_from_row(row)
+            if not alert.is_real_alert or alert.direction.lower() != CENTRAL_STATION.lower():
+                continue
 
+            if alert.train_id is not None:
+                train_ids.append(alert.train_id)
+            else:
+                red_alerts.append(alert)
+
+    logging.info(f'Found {len(red_alerts)} red alerts from {CENTRAL_STATION}')
+
+    logging.info(f'Found {len(train_ids)} trains from {CENTRAL_STATION}: {train_ids}')
+
+    central_station_id = _remove_leading_zeros(get_train_station_id(CENTRAL_STATION))
+    departure_from_central_requests = [
+        create_request_string(central_station_id, board_type=BoardType.DEPARTURE, train_code=train_id)
+        for train_id in train_ids
+    ]
+    arrivals_alerts = [a for req in departure_from_central_requests for a in parse_departure(req)]
+    return arrivals_alerts + red_alerts
+
+
+def parse_departure(request):
+    logging.debug(f'Extracting departing info from url: {request}')
+    alerts = [Alert.generate_from_row(row) for row in _find_journey_rows(request)]
+    alerts = [
+        a for a in alerts
+        if a.is_real_alert and a.direction.lower() == CENTRAL_STATION.lower()
+    ]
     return alerts
 
 
-def fetch_data(use_train_id=True):
-    reqs = create_requests(use_train_id)
-    alerts = [a for r in reqs for a in parse_request(r)]
+def _find_journey_rows(request):
+    soup = BeautifulSoup(requests.get(request).text, 'html.parser')
+    rows = soup.findAll('tr', id=lambda x: x and x.startswith('journeyRow'))
+    return rows
+
+
+def fetch_data():
+    station_ids = [_remove_leading_zeros(get_train_station_id(station)) for station in STATIONS_TO_MONITOR]
+    alerts = fetch_data_arrivals(station_ids) + fetch_data_departures(station_ids)
 
     return alerts
 
 
 if __name__ == '__main__':
-    pprint.pprint(fetch_data(use_train_id=False))
+    r = create_arrival_request('Hamburg-Tonndorf')
+    train_ids = extract_train_ids(r, 'Hamburg Hbf')
+

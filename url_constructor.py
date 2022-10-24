@@ -20,11 +20,16 @@ class TransportType(Enum):
     Taxi = auto()
 
 
-def create_request_string(train_station_id, filter_setting=None, train_code=None):
+class BoardType:
+    DEPARTURE = 'dep'
+    ARRIVAL = 'arr'
+
+
+def create_request_string(train_station_id, filter_setting=None, train_code=None, board_type='dep'):
     # use regional train by default
     filter_setting = filter_setting or TransportFilter(TransportType.Regional)
 
-    url = f'{BASE_URL}{parse.quote(train_station_id)}&boardType=dep&time=actual&productsFilter={filter_setting}&start=yes'
+    url = f'{BASE_URL}{parse.quote(train_station_id)}&boardType={board_type}&time=actual&productsFilter={filter_setting}&start=yes'
     if train_code is not None:
         url += f'&REQTrain_name={train_code}'
     return url
