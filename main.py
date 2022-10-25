@@ -32,10 +32,10 @@ def main():
 
     # notify new alerts and save
     send_alerts(new_alerts)
-    processed_alerts.extend(new_alerts)
+    processed_alerts.extend([a.encoded_alert for a in new_alerts])
 
     with open(PROCESSED_ALERTS_FILE, 'w') as f:
-        json.dump([a.encoded_alert for a in processed_alerts], f)
+        json.dump(list(processed_alerts), f)
 
 
 if __name__ == '__main__':
