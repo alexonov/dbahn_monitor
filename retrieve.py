@@ -13,7 +13,8 @@ For that we query departures from the station and arrivals to the station
     This case in not that simple. We need to know the time of
     departure from Hamburg.
     So first we save make a list of all the train from Hamburg,
-    then go look at the Hamburg departure board and check the status there
+    then go look at the Hamburg departure board and check the status there.
+    We do this only if the train id is there - otherwise we just post the message as is
 
 """
 import requests
@@ -25,32 +26,23 @@ from url_constructor import create_request_string, BoardType
 from settings import CENTRAL_STATION, STATIONS_TO_MONITOR
 from get_trainstation_ids import get_train_station_id
 from alert import Alert
-import sys
 
 
 def _remove_leading_zeros(s):
     return re.search("0*(\\d*)", s).group(1)
 
 
-def create_request(station_name, board_type):
-    station_id = _remove_leading_zeros(get_train_station_id(station_name))
-    request = create_request_string(station_id, board_type=board_type)
-    return request
-
-
-def create_departure_request(station_name):
-    return create_request(station_name, BoardType.DEPARTURE)
-
-
-def create_arrival_request(station_name):
-    return create_request(station_name, BoardType.ARRIVAL)
-
-
 def fetch_data_departures(station_ids):
     departure_to_central_requests = [
         create_request_string(sid, board_type=BoardType.DEPARTURE) for sid in station_ids
     ]
-    departure_alerts = [a for req in departure_to_central_requests for a in parse_departure(req)]
+    departure_alerts = [
+        a
+        for req in departure_to_central_requests
+        for a in parse_departure(req)
+        # only interested in trains going to Hamburg
+        if a.is_same_direction(CENTRAL_STATION)
+    ]
     return departure_alerts
 
 
@@ -89,10 +81,7 @@ def fetch_data_arrivals(station_ids):
 def parse_departure(request):
     print(f'Extracting departing info from url: {request}')
     alerts = [Alert.generate_from_row(row) for row in _find_journey_rows(request)]
-    alerts = [
-        a for a in alerts
-        if a.is_real_alert and a.direction.lower() == CENTRAL_STATION.lower()
-    ]
+    alerts = [a for a in alerts if a.is_real_alert]
     return alerts
 
 

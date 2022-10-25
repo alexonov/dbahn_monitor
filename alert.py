@@ -5,7 +5,7 @@ import re
 
 def _extract_span_text(cell, class_):
     try:
-        return cell.find_next('span', class_=class_).text.strip()
+        return ', '.join([t.text.strip() for t in cell.find_all('span', class_=class_)])
     except AttributeError:
         return None
 
@@ -19,6 +19,7 @@ class Alert(NamedTuple):
     red_alert: str
     delay_on_time: str
     train_id: str
+    delay: str
 
     @classmethod
     def generate_from_row(cls, row):
@@ -34,6 +35,7 @@ class Alert(NamedTuple):
         parsed_row['direction'] = _extract_span_text(direction_cell, class_='bold')
         parsed_row['red_alert'] = _extract_span_text(message_cell, class_='red')
         parsed_row['delay_on_time'] = _extract_span_text(message_cell, class_='delayOnTime bold')
+        parsed_row['delay'] = _extract_span_text(message_cell, class_='delay bold')
 
         train_cell = row.find_all('td', class_='train')[1]
         parsed_row['train_id'] = re.search('(?<=\().+?(?=\))', train_cell.find_next('a').text).group()
@@ -61,4 +63,7 @@ class Alert(NamedTuple):
 
     @property
     def encoded_alert(self):
-        return uuid.uuid3(uuid.NAMESPACE_DNS, str(self))
+        return str(uuid.uuid3(uuid.NAMESPACE_DNS, str(self)))
+
+    def is_same_direction(self, direction):
+        return self.direction.lower() == direction.lower()
