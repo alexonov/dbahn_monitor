@@ -20,7 +20,7 @@ if not PROCESSED_ALERTS_FILE.exists():
 
 
 def main():
-    print(f'Requesting status at {datetime.now().strftime("%d-%m-%yyyy %H:%M%:%S")} for {",".join(STATIONS_TO_MONITOR)}')
+    print(f'Requesting status at {datetime.now().strftime("%d-%m-%Y %H:%M:%S")} for {",".join(STATIONS_TO_MONITOR)}')
 
     # get all alerts
     alerts = fetch_data()
