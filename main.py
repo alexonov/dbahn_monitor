@@ -3,6 +3,8 @@ from telegram_bot import send_alerts
 from pathlib import Path
 import json
 from collections import deque
+from settings import STATIONS_TO_MONITOR
+from datetime import datetime
 
 
 PROCESSED_ALERTS_PATH = Path('data/processed_alerts')
@@ -17,6 +19,8 @@ if not PROCESSED_ALERTS_FILE.exists():
 
 
 def main():
+    print(f'Requesting status at {datetime.now().strftime("%d-%m-%yyyy %H:%M%:%S")} for {",".join(STATIONS_TO_MONITOR)}')
+
     # get all alerts
     alerts = fetch_data()
 
