@@ -19,6 +19,7 @@ def compile_url(message):
 def send_alerts(alerts: list[Alert]):
     for alert in alerts:
         notify(alert.formatted_alert)
+        print(alert.formatted_alert)
 
 
 def notify(message):

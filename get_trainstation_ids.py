@@ -36,7 +36,8 @@ def select_station_name(cleaned_suggestions):
 def get_train_station_id(train_station_name):
     raw_suggestions = query_suggestions_by_name(train_station_name)
     cleaned_suggestions = clean_suggestions(raw_suggestions)
-    return select_train_station_id(cleaned_suggestions)
+    raw_id = select_train_station_id(cleaned_suggestions)
+    return re.search("0*(\\d*)", raw_id).group(1)
 
 
 if __name__ == '__main__':

@@ -28,59 +28,62 @@ from get_trainstation_ids import get_train_station_id
 from alert import Alert
 
 
-def _remove_leading_zeros(s):
-    return re.search("0*(\\d*)", s).group(1)
+def fetch_data_departures():
+    alerts = []
+    for station in STATIONS_TO_MONITOR:
+        station_id = get_train_station_id(station)
+        request = create_request_string(station_id, board_type=BoardType.DEPARTURE)
+        print(f'Extracting departure from {station} to {CENTRAL_STATION}...')
+        parsed_alert = parse_departure(request, from_station=station, to_station=CENTRAL_STATION)
+        alerts.extend([a for a in parsed_alert if a.is_same_direction(CENTRAL_STATION)])
+    return alerts
 
 
-def fetch_data_departures(station_ids):
-    departure_to_central_requests = [
-        create_request_string(sid, board_type=BoardType.DEPARTURE) for sid in station_ids
-    ]
-    departure_alerts = [
-        a
-        for req in departure_to_central_requests
-        for a in parse_departure(req)
-        # only interested in trains going to Hamburg
-        if a.is_same_direction(CENTRAL_STATION)
-    ]
-    return departure_alerts
-
-
-def fetch_data_arrivals(station_ids):
-    arrival_requests = [create_request_string(sid, board_type=BoardType.ARRIVAL) for sid in station_ids]
+def fetch_data_arrivals():
 
     # keep train id is missing - keep as is, otherwise go to hamburg board
-    red_alerts = []
-    train_ids = []
-    for request in arrival_requests:
-        print(f'Extracting arrival info for url {request}')
+    no_train_alerts = []
+    train_alerts = []
+    for station in STATIONS_TO_MONITOR:
+        station_id = get_train_station_id(station)
+        request = create_request_string(station_id, board_type=BoardType.ARRIVAL)
+
+        print(f'Extracting arrival to {station} for url {request}')
 
         for row in _find_journey_rows(request):
-            alert = Alert.generate_from_row(row)
+            alert = Alert.generate_from_row(row, from_station=CENTRAL_STATION, to_station=station)
             if not alert.is_real_alert or alert.direction.lower() != CENTRAL_STATION.lower():
                 continue
 
             if alert.train_id is not None:
-                train_ids.append(alert.train_id)
+                train_alerts.append(alert)
             else:
-                red_alerts.append(alert)
+                no_train_alerts.append(alert)
 
-    print(f'Found {len(red_alerts)} red alerts from {CENTRAL_STATION}')
+    print(f'Found {len(no_train_alerts)} no train alerts from {CENTRAL_STATION}')
+    print(f'Found {len(train_alerts)} train alerts from {CENTRAL_STATION}')
 
-    print(f'Found {len(train_ids)} trains from {CENTRAL_STATION}: {train_ids}')
+    central_station_id = get_train_station_id(CENTRAL_STATION)
 
-    central_station_id = _remove_leading_zeros(get_train_station_id(CENTRAL_STATION))
-    departure_from_central_requests = [
-        create_request_string(central_station_id, board_type=BoardType.DEPARTURE, train_code=train_id)
-        for train_id in train_ids
-    ]
-    arrivals_alerts = [a for req in departure_from_central_requests for a in parse_departure(req)]
-    return arrivals_alerts + red_alerts
+    arrival_alerts = []
+    for train_alert in train_alerts:
+        print(f'Extracting departure from {CENTRAL_STATION} to {train_alert.to_station} on a {train_alert.train_id} train...')
+        request = create_request_string(
+            central_station_id,
+            board_type=BoardType.DEPARTURE,
+            train_code=train_alert.train_id
+        )
+        arrival_alerts.extend(parse_departure(request, from_station=CENTRAL_STATION, to_station=train_alert.to_station))
+
+    return arrival_alerts + no_train_alerts
 
 
-def parse_departure(request):
+def parse_departure(request, from_station, to_station):
     print(f'Extracting departing info from url: {request}')
-    alerts = [Alert.generate_from_row(row) for row in _find_journey_rows(request)]
+    alerts = [
+        Alert.generate_from_row(row, from_station=from_station, to_station=to_station)
+        for row in _find_journey_rows(request)
+    ]
     alerts = [a for a in alerts if a.is_real_alert]
     return alerts
 
@@ -92,13 +95,11 @@ def _find_journey_rows(request):
 
 
 def fetch_data():
-    station_ids = [_remove_leading_zeros(get_train_station_id(station)) for station in STATIONS_TO_MONITOR]
-    alerts = fetch_data_arrivals(station_ids) + fetch_data_departures(station_ids)
+    alerts = fetch_data_arrivals() + fetch_data_departures()
 
     return alerts
 
 
 if __name__ == '__main__':
-    r = create_arrival_request('Hamburg-Tonndorf')
-    train_ids = extract_train_ids(r, 'Hamburg Hbf')
+    pass
 

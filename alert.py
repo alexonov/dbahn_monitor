@@ -10,6 +10,10 @@ def _extract_span_text(cell, class_):
         return None
 
 
+def _remove_extra_spaces(s):
+    return ' '.join(s.split())
+
+
 class Alert(NamedTuple):
     planned_time: str
     direction: str
@@ -20,14 +24,16 @@ class Alert(NamedTuple):
     delay_on_time: str
     train_id: str
     delay: str
+    from_station: str
+    to_station: str
 
     @classmethod
-    def generate_from_row(cls, row):
+    def generate_from_row(cls, row, from_station, to_station):
         message_cell = row.find_next('td', class_='ris')
 
         parsed_row = {
             'planned_time': row.find_next('td', class_='time').text.strip(),
-            'train_name': row.find_next('span', class_='nowrap').text.strip(),
+            'train_name': _remove_extra_spaces(row.find_next('span', class_='nowrap').text.strip()),
             'platform': row.find_next('td', class_='platform').text.strip(),
             'message': message_cell.text.strip()
         }
@@ -40,11 +46,19 @@ class Alert(NamedTuple):
         train_cell = row.find_all('td', class_='train')[1]
         parsed_row['train_id'] = re.search('(?<=\().+?(?=\))', train_cell.find_next('a').text).group()
 
+        parsed_row['from_station'] = from_station
+        parsed_row['to_station'] = to_station
+
         return cls(**parsed_row)
+
+    @property
+    def route(self):
+        return f'{self.from_station} - {self.to_station}'
 
     @property
     def formatted_alert(self):
         return f"""
+*{self.route}*
 поезд: *{self.train_name}*
 направление: *{self.direction}*
 время: *{self.planned_time}*
