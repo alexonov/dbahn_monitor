@@ -1,3 +1,4 @@
+#!venv/bin/python
 from retrieve import fetch_data
 from telegram_bot import send_alerts
 from pathlib import Path
