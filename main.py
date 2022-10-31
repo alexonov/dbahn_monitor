@@ -11,6 +11,8 @@ from datetime import datetime
 PROCESSED_ALERTS_PATH = Path('data/processed_alerts')
 PROCESSED_ALERTS_FILE = PROCESSED_ALERTS_PATH / 'alerts.json'
 
+MAX_PROCESSED = 100_000
+
 
 # make sure file to store alerts exists
 PROCESSED_ALERTS_PATH.mkdir(parents=True, exist_ok=True)
@@ -38,6 +40,10 @@ def main():
     # notify new alerts and save
     send_alerts(new_alerts)
     processed_alerts.extend([a.encoded_alert for a in new_alerts])
+
+    # remove old processed if more than max
+    for _ in range(len(processed_alerts) - MAX_PROCESSED):
+        _ = processed_alerts.pop()
 
     with open(PROCESSED_ALERTS_FILE, 'w') as f:
         json.dump(list(processed_alerts), f)
